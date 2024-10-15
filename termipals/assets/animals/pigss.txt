@@ -1,0 +1,7 @@
+
+Generated ASCII Art:
+   __
+ /      \
+( o o   )
+  > ^ <
+```
