@@ -1,12 +1,1 @@
-[package]
-name = "termipals"
-version = "0.1.0"
-edition = "2021"
-description = "🐮 Your friendly neighborhood terminal companions!"
-authors = ["Termipals Contributors"]
-license = "MIT"
-
-[dependencies]
-clap = { version = "4.4", features = ["derive"] }
-anyhow = "1.0"
-colored = "2.0"
+{"encoding": "base64", "content": "W3BhY2thZ2VdCm5hbWUgPSAidGVybWlwYWxzIgp2ZXJzaW9uID0gIjAuMS4wIgplZGl0aW9uID0gIjIwMjEiCmRlc2NyaXB0aW9uID0gIvCfkq4gWW91ciBmcmllbmRseSBuZWlnaGJvcmhvb2QgdGVybWluYWwgY29tcGFuaW9ucyEiCmF1dGhvcnMgPSBbIlRlcm1pcGFscyBDb250cmlidXRvcnMiXQpsaWNlbnNlID0gIk1JVCIKCltkcnBlZGVuY2llc10KY2xhcCA9IHsgdmVyc2lvbiA9ICI0LjQiLCBmZWF0dXJlcyA9IFsiZGVyaXZlIl0gfQphbnlob3cgPSAiMS4wIgpjb2xvcmVkID0gIjIuMCI="}
