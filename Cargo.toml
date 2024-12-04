@@ -1,0 +1,12 @@
+[package]
+name = "termipals"
+version = "0.1.0"
+edition = "2021"
+description = "🐮 Your friendly neighborhood terminal companions!"
+authors = ["Termipals Contributors"]
+license = "MIT"
+
+[dependencies]
+clap = { version = "4.4", features = ["derive"] }
+anyhow = "1.0"
+colored = "2.0"
