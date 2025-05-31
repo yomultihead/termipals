@@ -6,6 +6,7 @@ install_requires = [
     "tqdm",
     "python-dotenv",
     "requests", # Added requests
+    "protobuf", # Added protobuf
 ]
 
 setup(
