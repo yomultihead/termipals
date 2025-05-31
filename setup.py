@@ -5,6 +5,7 @@ install_requires = [
     "accelerate",
     "tqdm",
     "python-dotenv",
+    "requests", # Added requests
 ]
 
 setup(

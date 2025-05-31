@@ -1,16 +1,21 @@
 #!/usr/bin/env python3
 
-import argparse
 import os
 import sys
 import logging
 from pathlib import Path
 from typing import Optional
 import random
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
-import torch
+# Removed: from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+# Removed: import torch
 from dotenv import load_dotenv
-from tqdm import tqdm
+# Removed: from tqdm import tqdm
+
+from termipals.llm_provider import HuggingFaceProvider, OllamaProvider # Updated import
+import os # Added import for environment variables
+
+# Ensure .env is loaded early
+load_dotenv()
 
 # Setup logging
 logging.basicConfig(
@@ -26,41 +31,79 @@ class Termipals:
         self.home_dir = Path.home()
         self.termipals_dir = self.home_dir / '.local' / 'share' / 'termipals'
         self.assets_dir = self.termipals_dir / 'assets' / 'animals'
-        self.model_dir = self.project_root / 'llm' / 'models'
-        
+        # self.model_dir = self.project_root / 'llm' / 'models' # Removed, managed by provider
+
         # Create necessary directories
         self.termipals_dir.mkdir(parents=True, exist_ok=True)
         self.assets_dir.mkdir(parents=True, exist_ok=True)
-        self.model_dir.mkdir(parents=True, exist_ok=True)
+        # self.model_dir.mkdir(parents=True, exist_ok=True) # Removed
 
-        # Model configuration
-        self.model_name = os.getenv('HUGGINGFACE_MODEL_ID')  # Using the original GPT-2 model
-        self.model_revision = "e7da7f221d5bf496a48136c0cd264e630fe9fcc8"  # Specific revision for stability
+        # LLM Provider Initialization
+        self.llm_provider = None
+        self.logger = logging.getLogger(__name__) # Ensure logger is available in __init__
+
+        provider_name = os.getenv('TERMI_PROVIDER', '').lower()
+        hf_model_id = os.getenv('HUGGINGFACE_MODEL_ID', 'distilgpt2')
+        hf_revision = os.getenv('HUGGINGFACE_MODEL_REVISION', 'main')
+        ollama_host = os.getenv('OLLAMA_HOST', 'http://localhost:11434')
+        ollama_model_name = os.getenv('OLLAMA_MODEL', 'llama2:7b') # Consider orca-mini or tinyllama for wider default use
+
+        provider_config = {
+            "huggingface_model_id": hf_model_id,
+            "huggingface_model_revision": hf_revision,
+            "ollama_host": ollama_host,
+            "ollama_model_name": ollama_model_name,
+            "connection_timeout": int(os.getenv('TERMI_CONNECTION_TIMEOUT', 5)),
+            "request_timeout": int(os.getenv('TERMI_REQUEST_TIMEOUT', 60)),
+            "ollama_options": {"temperature": float(os.getenv('OLLAMA_TEMPERATURE', 0.7))}
+            # Add other shared configs if any, e.g., logging level for providers
+        }
+
+        if provider_name == 'ollama':
+            self.logger.info("Attempting to use Ollama provider (specified by TERMI_PROVIDER)...")
+            self.llm_provider = OllamaProvider(config=provider_config)
+            if not self.llm_provider.is_available():
+                self.logger.warning("Ollama provider specified but not available. Falling back.")
+                self.llm_provider = None # Fallback will be handled below
+            else:
+                self.logger.info("Using Ollama provider (specified by TERMI_PROVIDER).")
+        elif provider_name in ['local', 'huggingface']:
+            self.logger.info("Using local HuggingFace provider (specified by TERMI_PROVIDER)...")
+            self.llm_provider = HuggingFaceProvider(config=provider_config)
+            if not self.llm_provider.is_available(): # Should generally be true unless deps are missing
+                self.logger.error("HuggingFace provider specified but not available (check dependencies: torch, transformers).")
+                # Critical error, perhaps exit or raise exception? For now, will fallback.
+                self.llm_provider = None
+        elif provider_name: # Unrecognized provider_name
+            self.logger.warning(f"Unrecognized TERMI_PROVIDER value: '{provider_name}'. Proceeding with auto-detection.")
+
+        # Auto-detection if no explicit provider set or if specified was unavailable
+        if self.llm_provider is None and not provider_name : # Only auto-detect if TERMI_PROVIDER was empty
+            self.logger.info("TERMI_PROVIDER not set. Attempting to auto-detect Ollama provider...")
+            ollama_candidate = OllamaProvider(config=provider_config)
+            if ollama_candidate.is_available():
+                self.llm_provider = ollama_candidate
+                self.logger.info("Ollama provider auto-detected and available. Using Ollama provider.")
+            else:
+                self.logger.info("Ollama provider not detected or not available during auto-detection.")
         
-    def setup_model(self):
-        """Initialize the model for generation"""
-        logger.info("🤖 Loading model...")
-        
-        model = AutoModelForCausalLM.from_pretrained(
-            self.model_name,
-            revision=self.model_revision,
-            device_map="auto",
-            torch_dtype=torch.float32,
-            cache_dir=str(self.model_dir)
-        )
-        tokenizer = AutoTokenizer.from_pretrained(
-            self.model_name,
-            revision=self.model_revision,
-            cache_dir=str(self.model_dir)
-        )
-        
-        self.pipe = pipeline(
-            "text-generation",
-            model=model,
-            tokenizer=tokenizer,
-            device_map="auto"
-        )
-        logger.info("✨ Model loaded successfully!")
+        # Default to HuggingFace if no provider has been successfully initialized yet
+        if self.llm_provider is None:
+            if provider_name and provider_name not in ['ollama', 'local', 'huggingface']: # if specified but unrecognized
+                 self.logger.info(f"Falling back to local HuggingFace provider (due to unrecognized TERMI_PROVIDER: '{provider_name}').")
+            elif provider_name == 'ollama': # if specified ollama but it failed
+                 self.logger.info("Falling back to local HuggingFace provider (Ollama specified but was not available).")
+            elif provider_name in ['local', 'huggingface']: # if specified HF but it failed (e.g. missing deps)
+                 self.logger.critical("HuggingFace provider specified but failed to initialize. Termipals might not function correctly.")
+                 # This is a critical state. The HuggingFaceProvider's is_available() should return false.
+                 # self.llm_provider will be assigned in the final default block if it's still None.
+                 # For now, we let it fall through to the final default assignment.
+            else: # Default case (no TERMI_PROVIDER, Ollama not auto-detected)
+                self.logger.info("Using local HuggingFace provider (default).")
+            # This final assignment ensures self.llm_provider is always set.
+            self.llm_provider = HuggingFaceProvider(config=provider_config)
+
+    # Removed setup_model(self) method
 
     def generate_art(self, animal: str) -> str:
         """Generate ASCII art for an animal"""
@@ -83,28 +126,16 @@ Example of good ASCII art:
 Now create the ASCII art:"""}
         ]
 
-        generation_args = {
-            "max_new_tokens": 500,
-            "return_full_text": False,
-            "temperature": 0.7,
-            "do_sample": True,
-        }
-
-        output = self.pipe(messages, **generation_args)
-        art = output[0]['generated_text']
+        # generation_args are now handled by the provider
+        # output = self.pipe(messages, **generation_args) # Old call
         
-        # Clean up the output
-        art_lines = []
-        capture = False
-        for line in art.split('\n'):
-            if not capture and any(c in line for c in r'/\|_-~^'):
-                capture = True
-            if capture and line.strip():
-                art_lines.append(line.rstrip())
-            elif capture and not line.strip() and art_lines:
-                break
+        art = self.llm_provider.generate_art(messages)
         
-        return '\n'.join(art_lines)
+        # Cleaning logic is now primarily in the provider's _clean_art method.
+        # The provider should return already cleaned art.
+        # If additional cleaning specific to this CLI context is needed, it can be added here.
+        # For now, assume provider's cleaning is sufficient.
+        return art
 
     def save_art(self, animal: str, art: str):
         """Save generated art to assets directory"""
@@ -154,6 +185,8 @@ def main():
 
     args = parser.parse_args()
 
+    # Moved load_dotenv() to the top of the script
+
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)
 
@@ -164,8 +197,11 @@ def main():
         return
 
     if args.create:
+        if args.animal == "random": # Cannot create a random animal
+            logger.error("❌ Please specify an animal name to create. Example: --create cat")
+            return
         logger.info(f"🎨 Generating ASCII art for '{args.animal}'...")
-        app.setup_model()
+        # app.setup_model() # Removed call, model setup is on-demand by provider
         art = app.generate_art(args.animal)
         print("\nGenerated ASCII Art:")
         print(art)
@@ -188,4 +224,4 @@ def main():
         logger.error(f"❌ Animal '{args.animal}' not found. Use --create to generate it!")
 
 if __name__ == "__main__":
-    main() 
+    main()
