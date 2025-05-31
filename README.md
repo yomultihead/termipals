@@ -14,23 +14,36 @@ Add some joy to your terminal with friendly ASCII art animals! Termipals uses a 
 
 ## 📦 Installation
 
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/termipals.git
-cd termipals
-```
+### Prerequisites
+- Git
+- Python 3.8+
+- [uv](https://github.com/astral-sh/uv): A fast Python installer and resolver.
+  If you don't have `uv` installed, you can install it via pip:
+  ```bash
+  pip install uv
+  ```
+  Or, for other installation methods, see the [official uv installation guide](https://astral.sh/uv/install.sh).
 
-2. Create and activate a virtual environment:
-```bash
-python -m venv .venv
-source .venv/bin/activate  # On Windows, use: .venv\Scripts\activate
-```
+### Installation Steps
 
-3. Install the package in editable mode:
-```bash
-pip install -e .
-```
-    This will install Termipals and its dependencies, including `transformers`, `torch`, and `requests`.
+1.  **Clone the repository**:
+    ```bash
+    git clone https://github.com/yourusername/termipals.git # Replace with the actual URL if different
+    cd termipals
+    ```
+
+2.  **Create and activate a virtual environment using `uv`**:
+    ```bash
+    uv venv
+    source .venv/bin/activate  # On Windows, use: .venv\Scripts\activate
+    ```
+    *(This creates a virtual environment in the `.venv` directory and activates it.)*
+
+3.  **Install the package and its dependencies using `uv`**:
+    ```bash
+    uv pip install -e .
+    ```
+    *(This will install Termipals in editable mode along with all necessary dependencies like `transformers`, `torch`, `requests`, and `protobuf` as defined in `setup.py`.)*
 
 The first time you run a generation command with the default local Hugging Face provider, it will download the model (e.g., `distilgpt2`, approx. 300-400MB) to a cache directory (typically `~/.cache/termipals/models/`).
 
@@ -152,11 +165,19 @@ termipals/
 
 ## 🛠️ Development
 
-1.  Clone the repository.
-2.  Create a virtual environment (see Installation).
-3.  Install development dependencies:
+1.  **Clone the repository** (if you haven't already):
     ```bash
-    pip install -e ".[dev]"
+    # git clone ...
+    # cd termipals
+    ```
+2.  **Ensure your virtual environment is activated**:
+    If you followed the installation steps using `uv`, activate it via:
+    ```bash
+    source .venv/bin/activate  # On Windows, use: .venv\Scripts\activate
+    ```
+3.  **Install development dependencies** (if you have a `[dev]` extra in `setup.py`):
+    ```bash
+    uv pip install -e ".[dev]"
     ```
     *(Ensure your `setup.py` includes a `[dev]` extra with tools like `pytest`, `flake8` etc.)*
 
